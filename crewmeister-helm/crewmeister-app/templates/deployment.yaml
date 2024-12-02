@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "crewmeister-app.fullname" . }}
+  labels:
+    {{- include "crewmeister-app.labels" . | nindent 4 }}
+spec:
+  imagePullSecrets:
+  - name: ecr-secret
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "crewmeister-app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "crewmeister-app.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "crewmeister-app.serviceAccountName" . }}
+      imagePullSecrets:
+        {{- if .Values.imagePullSecrets }}
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+        {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+          - name: SPRING_DATASOURCE_URL
+            value: "jdbc:mysql://{{ include "crewmeister-app.fullname" . }}-mysql.{{ .Release.Namespace }}.svc.cluster.local:3306/challenge?createDatabaseIfNotExist=true"
+          - name: SPRING_DATASOURCE_WRITER_URL
+            value: "jdbc:mysql://{{ include "crewmeister-app.fullname" . }}-mysql.{{ .Release.Namespace }}.svc.cluster.local:3306/challenge?createDatabaseIfNotExist=true"
+          - name: SPRING_DATASOURCE_USERNAME
+            value: "root" # Use the MySQL root user explicitly
+          - name: SPRING_DATASOURCE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mysql
+                key: mysql-root-password
+
+
+
+          {{- if .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+      {{- if .Values.volumes }}
+      volumes:
+        {{- toYaml .Values.volumes | nindent 8 }}
+      {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}

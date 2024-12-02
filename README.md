@@ -1,61 +1,75 @@
-# Challenge Application
+## Image Build and push
 
-A Spring Boot application that provides a simple user management REST API.
+# I created a multi-stage, light weighted Dockerfile
 
-## Technologies Used
+# I created a build-and-push.yml for the CI pipeline;
 
-- Java 17
-- Spring Boot 3.3.5
-- MySQL Database
-- Flyway Migration
-- Maven
-- Spring Data JPA
-- Spring Actuator
+mkdir -p .github/workflows/build-and-push.yml
+brew install maven
+mvn wrapper:wrapper
 
-## Prerequisites
+## Pipeline was created after a push
 
-- JDK 17
-- MySQL
-- Maven
+# You can see the pipeline [HERE](https://github.com/festuge/crewmeister-demo/actions/runs/12090707008/job/33718081003)
 
-## API Endpoints
+## crewmeister-helm: This directory Contains terraform files and a helm chart for the crewmeister-app
+# After files were creates, I created a minikube cluster
 
-### GET /user
-Retrieves a user by ID 
+brew install minikube
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-darwin-amd64
+sudo install minikube-darwin-amd64 /usr/local/bin/minikube
+brew install hyperkit
+brew install minikube
+minikube config set driver hyperkit
+minikube start --driver=hyperkit
+minikube start --cpus=4 --memory=4096
 
-### POST /user
-Creates a new user
+# I then created my mysql database using helm with a mysql chart from bitnami in the default namespace;
 
----
+helm upgrade --install mysql bitnami/mysql --version 12.1.0 \              
+  --namespace default \
+  --set auth.rootPassword=dev \
+  --set auth.database=challenge \
+  --set auth.username="" \
+  --set auth.password="" \
+  --set primary.persistence.enabled=false \
+  --set primary.resources.requests.memory=256Mi \
+  --set primary.resources.requests.cpu=500m \
+  --set primary.resources.limits.memory=512Mi \
+  --set primary.resources.limits.cpu=1 \
+  --set secondary.enabled=false
 
-# Crewmeister Challenge
+# Then after, I applied my terraform configuration.
+
+terraform init
+terraform fmt
+terraform validate
+terraform apply
+
+# Locally, I port-forwarded the service of the crewmeister-app on 9000:8080 and saw "It worked"
+
+kubectl get svc
+Kubectl port-forward svc/crewmeister-app 9000:8080
+
+# I then added (POST) entries and read (GET) entries into the mysql database
+
+curl -X POST http://localhost:9000/user \            
+-H "Content-Type: application/json" \
+-d '{"name": "Samantha Giovino", "email": "samantha.giovino@crewmeister.com"}'
+
+curl -X GET "http://localhost:9000/user?id=5"
+
+# I then exec into the mysql database to query the database 
+
+kubectl get pods
+kubectl exec -it mysql-0 -- sh
+mysql -u root -p
+SHOW DATABASES;
+use challenge;
+show tables;
+select * from user;
+
+# Here is a screenshot ![Local Image](crewmeister-helm/images/entries.png)
 
 
-## Background
 
-At Crewmeister we continuously grow our development team. We aim to hire the best educated, motivated and enthusiastic people in the field that have fun to build up Crewmeister in our vision to empower small businesses to thrive in a digital world. For this quest, we are continuously getting new applicants from all over the world. In order to filter, which candidates could be a good fit, we are letting our candidates do a coding challenge that we manually review and evaluate. We want to automate this process to reduce the time that is spent manually checking code that is not working.
-
- 
-
-## Task
-
-Your challenge is to be able to run the code in local kubenetes via Helm chart and Terraform. 
-
-- Docker File 
-
-- Helm Chart
-
-- Terraform to connect to Local Kubernetes
-- deploy helm chart 
-
-## Plus:
-
-- Create CI Pipeline in Github to build project and create the docker Image, push to registry
-
-- Pull Image from registry in helm chart and deploy in local kubernetes via Terrafrom
-
- 
-
-## Note:
-
-- Accessible on local system
