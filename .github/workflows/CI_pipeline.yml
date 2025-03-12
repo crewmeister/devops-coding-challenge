@@ -1,0 +1,103 @@
+name: CI pipleine creation for Spring Boot application
+
+# This workflow is triggered whenever a new PR is created on the mentioned branch
+on:
+  push:
+    branches:
+      - feature/assignment-a
+
+env:
+  DB_DATABASE: crewmeister
+jobs:
+    Build-and-Push:
+      runs-on: ubuntu-latest
+      steps:
+      - uses: actions/checkout@v4
+        name: Checkout the crewmeister repository          
+
+      - name: Prerequisite 1 - Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+            java-version: '17'
+            distribution: 'temurin'
+            cache: 'maven'
+
+#which ensures the correct Maven version is used, no matter who runs the pipeline.
+#the wrapper is designed to handle Maven installation
+      - name: Prerequisite 2 - Build project crewmeister with Maven
+        run: ./mvnw clean package -DskipTests 
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: sowr94
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+            context: .
+            push: true
+            tags: sowr94/spring-boot-application:latest
+
+# To setup Pre-requisite 3 MySQL database.
+      - name: Prerequisite 3 - To setup MySQL DB.
+        run: |
+          sudo /etc/init.d/mysql start
+          mysql -e 'CREATE DATABASE ${{ env.DB_DATABASE }};' -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }}
+      - name: Verify MySQL Database
+        run: |
+          mysql -h localhost  -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} -e "SHOW DATABASES;"
+
+#Set up K8s cluster using Minikube
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v2.13.0
+        with:
+         minikube version: 'v1.34.0'
+         kubernetes version: 'v1.30.0'
+         driver: 'docker'
+
+      - name: Start Minikube
+        run: |
+           minikube start --driver=docker
+           kubectl config use-context minikube
+
+      - name: Check Minikube status
+        run: |
+             minikube status
+             kubectl get nodes
+
+      - name: Set up Kubernetes context
+        run: |
+           kubectl config use-context minikube
+
+#Installation of helm
+      - name: Set up Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: "v3.10.0"
+
+      - name: Verify Helm Installation
+        run: helm version
+#Installation of Terraform
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.9
+      - name: Check working directory
+        run: |
+            pwd  # Print current working directory
+            ls -l  # List files and directories
+
+      - name: Verify Terraform Installation
+        run: terraform --version
+       
+      - name: Terraform Init and Apply
+        run: |
+          cd crewmeister-helm-chart
+          terraform init
+          terraform plan
+          terraform apply -auto-approve
+        
+
+            

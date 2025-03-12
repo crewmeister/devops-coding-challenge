@@ -1,0 +1,38 @@
+replicaCount: 2
+image:
+  repository: sowr94/spring-boot-application
+  pullPolicy: IfNotPresent
+  tag: latest
+imagePullSecrets:
+  - name: crewmeister-secret
+
+serviceAccount:
+  create: true
+  automount: true
+  name: "crewmeister-service-account"
+
+service:
+  port: 8080
+  type: ClusterIP
+
+ingress:
+  enabled: false
+  hosts:
+    - host: crewmeister-app.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+
+resources:
+  limits:
+    cpu: "1"
+    memory: "512Mi"
+  requests:
+    cpu: "500m"
+    memory: "256Mi"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
